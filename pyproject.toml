@@ -1,0 +1,56 @@
+[project]
+name = "helpbutton"
+version = "0.1.0"
+description = "Hlasové tlačítko s AI, které seniorům opraví telefon s Androidem nebo počítač s Windows přes domácí síť"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "David Polastik" },
+    { name = "Adam Kolařík" },
+    { name = "Tomáš Kašpárek" },
+    { name = "Tomáš Zapletal" },
+    { name = "Jan Dvořák" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "websockets>=12",
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "zeroconf>=0.131",
+    "pillow>=10.1",
+]
+
+[project.optional-dependencies]
+voice = ["faster-whisper>=1.0"]
+claude = ["anthropic>=0.60"]
+pc = [
+    "mss>=9",
+    "pyautogui>=0.9.54",
+    "pywinauto>=0.6.8; sys_platform == 'win32'",
+    "winrt-runtime>=3; sys_platform == 'win32'",
+    "winrt-Windows.Foundation>=3; sys_platform == 'win32'",
+    "winrt-Windows.Foundation.Collections>=3; sys_platform == 'win32'",
+    "winrt-Windows.Globalization>=3; sys_platform == 'win32'",
+    "winrt-Windows.Graphics.Imaging>=3; sys_platform == 'win32'",
+    "winrt-Windows.Media.Ocr>=3; sys_platform == 'win32'",
+    "winrt-Windows.Storage.Streams>=3; sys_platform == 'win32'",
+]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[tool.setuptools.packages.find]
+include = ["helpbutton*"]
+
+[tool.setuptools.package-data]
+"helpbutton.server" = ["static/*"]
+"helpbutton" = ["skills/*/SKILL.md"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests", "raspberry_pi"]
+
+[tool.black]
+line-length = 110
+target-version = ["py311"]

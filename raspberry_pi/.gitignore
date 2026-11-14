@@ -1,0 +1,5 @@
+.tts_cache/
+voices/
+rpi_button.toml
+__pycache__/
+*.pyc

@@ -1,0 +1,39 @@
+# HelpButton × Home Assistant (varianta podle TDD: ESPHome + Wyoming + Faster-Whisper + Piper)
+#
+# Když chcete místo vlastního firmwaru použít Atom Echo s ESPHome a hlasový
+# pipeline Home Assistantu (Wyoming faster-whisper + Wyoming piper), stačí HA
+# předávat přepsanou větu orchestrátoru HelpButton a jeho odpověď nechat přečíst.
+#
+# 1) Atom Echo nahrajte jako ESPHome "voice assistant" (oficiální projekt M5Stack Atom Echo).
+# 2) V HA vytvořte Assist pipeline: STT = Wyoming faster-whisper (cs), TTS = Wyoming piper (cs_CZ).
+# 3) Vložte do configuration.yaml (nahraďte HELPBUTTON_SERVER adresou serveru):
+
+rest_command:
+  helpbutton_utterance:
+    url: "http://HELPBUTTON_SERVER:8765/api/utterance"
+    method: POST
+    content_type: "application/json"
+    headers:                     # když má server [helpbutton] token; klíč vypíše: python -m helpbutton.server --api-key
+      Authorization: "Bearer HELPBUTTON_API_KEY"
+    payload: '{"text": {{ text | tojson }}, "source": "homeassistant"}'
+    timeout: 120
+
+automation:
+  - alias: "HelpButton – předat větu orchestrátoru"
+    triggers:
+      - trigger: conversation
+        command:
+          - "{query}"
+    actions:
+      - action: rest_command.helpbutton_utterance
+        data:
+          text: "{{ trigger.slots.query }}"
+        response_variable: helpbutton
+      - set_conversation_response: "{{ helpbutton.content.say }}"
+
+# Upozornění pro rodinu přes HA: v helpbutton.toml nastavte
+#   [notify] webhook_url = "http://HA:8123/api/webhook/helpbutton-rodina"
+# a vytvořte automatizaci s triggerem webhook, která pošle notify.mobile_app_*.
+#
+# Pozn.: wildcard-only věta "{query}" ověřte na své verzi HA; případně ji
+# nahraďte vlastním conversation agentem.

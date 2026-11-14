@@ -1,0 +1,80 @@
+# Konfigurace hlasového tlačítka pro Raspberry Pi 5 (zkopírujte jako rpi_button.toml)
+
+[server]
+url = "auto"                      # "auto" (mDNS hledání v LAN) nebo např. "http://192.168.1.10:8765"
+token = ""                        # stejný jako [helpbutton] token v helpbutton.toml serveru (nebo proměnná HELPBUTTON_TOKEN)
+standalone_fallback = true        # automatický nouzový provoz přímo na Pi 5 při výpadku LAN serveru
+
+[button]
+# Pozor: GPIO 2, 3 (I2C) a 18, 19, 20, 21 (I2S) obsazuje zvukový HAT – firmware je odmítne.
+gpio_pin = 17                     # BCM 17 = fyzický pin 11 na Raspberry Pi 5 (spíná proti GND na pinu 9)
+led_pin = 27                      # BCM 27 = fyzický pin 13 na Raspberry Pi 5 (PWM stavová LED); bez LED: led_pin = false
+enable_gpio = true                # současně funguje GPIO tlačítko...
+enable_keyboard = true            # ...i Mezerník / Enter / USB tlačítko
+led_pwm_breathing = true          # plynulé PWM dýchání LED (pokud je připojena)
+
+[audio]
+# Hardware: Audio Injector Zero (WM8731, I2S HAT), overlay `audioinjector-wm8731-audio`, PipeWire 1.4
+backend = "auto"                  # "auto" (PipeWire, jinak přímo HAT) | "pipewire" | "alsa" (obejde PipeWire: 48 kHz / 2 kan.)
+alsa_card = "audioinjectorpi"     # ALSA jméno karty z `aplay -l`
+output_volume_pct = 92            # hlasitost výstupu při startu (92 % drží čistou rezervu bez chrčení 3,5mm reproduktorů)
+output_loudness = true            # řeč HelpButton hlasitější o ~6 dB (kompresor + lookahead limiter), bez ořezu a zkreslení
+hat_mixer_init = true            # při startu: Input Mux = Mic, Mic Boost, Capture, bez Sidetone / Line Bypass
+mic_device = "auto"               # auto: PipeWire výchozí zdroj (Built-in Audio Stereo) -> mikrofon HATu -> USB
+speaker_device = "auto"           # auto: PipeWire výchozí výstup -> 3,5mm jack „Phones“ na HATu -> USB
+sample_rate = 16000               # interní frekvence pro Whisper/VAD (HAT běží nativně na 48 kHz, převod je automatický)
+mic_bandpass_filter = true        # pásmová propust řeči 85–7200 Hz (odstraní 50Hz brum sítě)
+mic_agc_enabled = true            # automatické zesílení tiché/vzdálené řeči (AGC) před vstupem do Whisperu
+mic_agc_target_rms = 4800.0       # cílová RMS hlasitost řeči (~ -16.5 dBFS)
+mic_agc_max_gain = 6.0            # max. zesílení tiché řeči (+15.6 dB), jeden zisk pro celou nahrávku (žádné pumpování)
+mic_transient_filter = true       # ztlumení izolovaných ťuknutí do stolu (souhlásky p/t/k zůstávají)
+mic_noise_subtraction = true      # jemná šumová brána mezi slovy (max −6 dB, plynulá)
+senior_clarity_dsp = true         # psychoakustický filtr pro seniory (zesílení souhlásek 2-4 kHz + kompresor)
+clarity_presence_gain = 1.55      # míra zvýraznění sykavek a souhlásek
+slow_repeat_rate = 0.68           # tempo řeči při žádosti "Cože? / Zopakuj pomaleji"
+working_heartbeat_s = 2.5         # jemné tiknutí každé 2.5 s při dlouhé diagnostice
+
+[vad]
+pre_roll_ms = 500                 # 0.5 s záznam před začátkem řeči (aby se neuřízlo první slovo)
+min_listen_s = 4.0                # minimálně 4 s poslechu po stisku tlačítka (nevypne se uprostřed nádechu)
+start_timeout_s = 7.0             # jak dlouho čeká, než dědeček začne mluvit
+followup_start_timeout_s = 4.0    # kratší čekání na odpověď ANO / NE
+silence_tail_s = 1.15             # 1.15 s ticha po běžné větě (rychlé vyhodnocení)
+followup_silence_tail_s = 0.80    # 0.80 s ticha u delší odpovědi
+short_burst_silence_tail_s = 0.50 # 0.50 s bleskové ukončení po krátkém "Ano" / "Ne" (jen followup)
+hesitation_silence_tail_s = 1.8   # 1.8 s prodloužené čekání při nedořečené větě ("Zmizel mi a...")
+rolling_stt_pause_s = 0.45        # po 0.45 s ticha spustí na pozadí plný přepis (hotový zároveň s koncem ticha)
+likely_complete_tail_s = 0.75     # ticho po větě, kterou Whisper uzavřel tečkou (místo 1.15 s)
+speech_trim_tail_ms = 450         # do STT jde jen řeč + 0.45 s rezerva pro doznění hlásek, ne celé ticho na konci
+min_speech_s = 0.22               # minimální délka souvislé řeči (odfiltruje krátké lupnutí tlačítka)
+max_record_s = 25.0
+echo_guard_s = 0.22               # 220 ms pauza po domluvení HelpButton proti ozvěně z reproduktoru
+press_grace_s = 0.45              # 450 ms ochrana proti nechtěnému dvojkliku třesoucí se rukou
+speak_listening_greeting = false  # false = po stisku rovnou poslouchá bez zdržující hlášky "Poslouchám"
+listen_beep = true                # krátké pípnutí před zapnutím mikrofonu (false = tichý okamžitý poslech)
+auto_listen_followups = true      # po otázce HelpButton ("Řekněte ano") automaticky zapne mikrofon
+vad_aggressiveness = 2
+min_rms_threshold = 160.0
+near_field_tv_rejection = true    # odfiltruje vzdálenou televizi/rádio tišší než hlas dědečka u mikrofonu
+near_field_drop_ratio = 0.22
+
+[stt]
+mode = "auto"                     # "auto" | "local" (Faster-Whisper na Pi 5) | "server"
+whisper_model = "base"            # "base" (~3× rychlejší na Pi 5) nebo "small" (vyšší přesnost); int8 Cortex-A76
+whisper_threads = 4               # 4 jádra Cortex-A76 na Raspberry Pi 5
+whisper_beam_size = 1             # greedy dekódování (beam=1): ~3× rychlejší přepis (~0.4–1.0 s) bez prodlev
+language = "cs"                   # "cs" = vždy čeština (nejpřesnější a nejrychlejší) | "auto" = i angličtina (demo)
+vocabulary = []                   # jména a slova navíc, např. ["Denis", "Lenka", "Mapy.cz"] – Whisper je píše správně
+whisper_vad_filter = false        # Silero VAD ve Whisperu (zvuk už je oříznutý; zapnutí může zahodit tichou řeč)
+fuzzy_senior_repair = true        # fonetická oprava přeřeknutí ("votsap" -> "WhatsApp", "esemeska" -> "SMS")
+auto_translate_to_cs = true       # v režimu language = "auto": přeloží anglické věty do češtiny
+bilingual_tts = false             # při true čte odpovědi česky i anglicky
+rolling_micro_stt = true          # přepis na pozadí během pomlky (výsledek je hotový zároveň s koncem ticha)
+
+[tts]
+engine = "auto"                   # "auto" (piper -> edge -> server -> espeak) | "piper" | "edge" | "espeak"
+edge_voice = "cs-CZ-VlastaNeural" # český ženský hlas HelpButton
+piper_bin = "piper"
+piper_model = "raspberry_pi/voices/cs_CZ-jirka-medium.onnx"
+speech_rate = 0.85                # pomalejší tempo řeči pro seniory
+sentence_streaming_tts = true     # čte první větu ihned, zatímco druhou syntetizuje na pozadí

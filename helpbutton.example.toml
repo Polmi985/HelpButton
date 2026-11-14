@@ -1,0 +1,113 @@
+# Zkopírujte jako helpbutton.toml a upravte. Vše je volitelné.
+
+[helpbutton]
+senior_name = "Paní Jano"      # oslovení (5. pád)
+senior_female = true
+port = 8765
+token = ""                     # párovací token: server a démony se jím navzájem ověří (token po síti nejde).
+                               # Doporučeno! Vygenerujte: python -c "import secrets; print(secrets.token_urlsafe(24))"
+                               # a stejný dejte démonům: --token ... nebo $env:HELPBUTTON_TOKEN
+                               # S tokenem jdou stránky a API z jiných počítačů jen s klíčem (prohlížeč: /login,
+                               # helpbutton.cli --token; ESP32 / Home Assistant: python -m helpbutton.server --api-key)
+# allowed_hosts = ["helpbutton.mojedomena.cz"]   # jména serveru s tečkou navíc (IP, localhost, *.local projdou vždy)
+# agent_runs_keep_days = 14    # historie běhů agenta se snímky obrazovky se pak sama smaže
+data_dir = "data"
+mdns = true
+adb_watchdog = true            # Self-Healing Wireless ADB
+
+[family]                       # kdo dostává upozornění a komu HelpButton volá
+name = "Petr"
+dative = "Petrovi"
+phone = "+420 777 000 111"
+aliases = ["petr", "petrovi", "petra", "syn", "synovi"]
+
+[[contacts]]                   # důvěryhodné kontakty – jiným lidem HelpButton nepíše ani nevolá
+name = "Lenka"
+dative = "Lence"
+phone = "+420 777 123 456"
+aliases = ["lenka", "lence", "lenku", "vnucka", "vnucce"]
+
+# [[apps]]                     # důležité aplikace navíc
+# name = "Mapy"
+# package = "cz.seznam.mapy"
+# aliases = ["mapy", "mapa"]
+
+# [sites]
+# obec = "https://www.mojeobec.cz"
+
+[llm]
+provider = "auto"              # auto | claude | ollama | gemini | keywords
+claude_model = "claude-opus-5-5"   # klíč v ANTHROPIC_API_KEY
+ollama_url = "http://localhost:11434"
+ollama_model = "qwen3-vl:8b-instruct"   # porozumění větám lokálně (stejný model jako [vlm]); 4 GB VRAM: qwen3-vl:2b-instruct
+local_first = true             # stažený model v Ollamě je hlavní, cloud jen záloha
+gemini_model = "gemini-3.5-flash"  # při přetížení zkusí gemini-flash-latest a flash-lite
+
+[vlm]                          # GUI agent (Vision model)
+provider = "auto"              # auto | claude | gemini | ollama | none | název bloku [[providers]]
+ollama_model = "qwen3-vl:8b-instruct"   # ollama pull qwen3-vl:8b-instruct (~6 GB, 8 GB VRAM); 4 GB VRAM: qwen3-vl:2b-instruct
+local_first = true             # true = lokální Ollama hlavní, cloud jen záloha; false = obráceně
+# ollama_max_pixels = 1000000  # velikost snímku pro lokální model (~1000 obrazových tokenů); slabší GPU: 600000
+# ollama_num_ctx = 8192        # kontext lokálního modelu (stejný se použije i pro věty)
+# zoom_refine = true           # klik na x,y mimo prvky ověřit na 2× zvětšeném výřezu (1 dotaz navíc)
+
+[voice]
+whisper_model = "small"        # tiny | base | small | medium | large-v3
+whisper_device = "auto"        # auto | cpu | cuda
+whisper_compute_type = "auto"  # auto (int8 na CPU, float16 na CUDA) | int8 | float16
+whisper_beam_size = 1          # greedy dekódování (1 = nejrychlejší, ~0.4–1.0 s)
+whisper_warmup = true          # přednačíst a zahřát Whisper hned při startu serveru
+piper_bin = "piper"
+piper_model = ""               # např. "voices/cs_CZ-jirka-medium.onnx"
+speech_rate = 0.85
+
+[notify]
+webhook_url = ""               # např. "https://ntfy.sh/helpbutton-rodina-nahodny-retezec" nebo HA webhook
+
+[keys]                         # klíče vyplňte jen v helpbutton.toml (git ho ignoruje), ne tady
+gemini_api_key = ""
+anthropic_api_key = ""
+
+# --- OpenRouter: bezplatné modely (záloha, když Gemini nestíhá) ----------------------------
+# Pořadí bloků = pořadí, v jakém se zkoušejí. Limit zdarma ~50 dotazů/den, 20/min.
+# Model, který zmizí nebo přestane být zdarma, vypíše server do logu i se seznamem dostupných.
+# Klíč: openrouter.ai → Keys (začíná sk-or-…), do všech bloků stejný.
+
+[[providers]]                  # OpenRouter: hlavní záloha agenta – zdarma, obrázky + JSON (ověřeno 11/2026, ~4 s)
+name = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+model = "nvidia/nemotron-3.5-super-vl:free"
+vision = true
+use = ["vlm", "llm"]
+api_key = ""
+
+[[providers]]                  # OpenRouter: Google Gemma 4 31B – zdarma, obrázky + JSON
+name = "openrouter-gemma"
+base_url = "https://openrouter.ai/api/v1"
+model = "google/gemma-4-31b-it:free"
+vision = true
+use = ["vlm"]
+api_key = ""
+
+[[providers]]                  # OpenRouter: dots.3 note – zdarma, obrázky + JSON
+name = "openrouter-dots"
+base_url = "https://openrouter.ai/api/v1"
+model = "dots-studio/dots-3-note-preview:free"
+vision = true
+use = ["vlm"]
+api_key = ""
+
+[[providers]]                  # OpenRouter: automatický výběr volného bezplatného modelu (pomalejší, poslední záloha)
+name = "openrouter-auto"
+base_url = "https://openrouter.ai/api/v1"
+model = "openrouter/free"
+vision = true
+use = ["vlm"]
+api_key = ""
+
+[[providers]]                  # OpenRouter: porozumění větám a odpovědi na otázky (ověřeno, ~2 s)
+name = "openrouter-text"
+base_url = "https://openrouter.ai/api/v1"
+model = "baidu/ernie-5.5-flash-preview:free"
+use = ["llm"]
+api_key = ""
