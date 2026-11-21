@@ -19,7 +19,7 @@ $files = @(git ls-files) | Where-Object {
 if (-not $files) { throw "Žádné soubory z git ls-files." }
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null
-$zipPath = Join-Path $Root "$OutDir\HelpButton-Jirik-v$ver-win.zip"
+$zipPath = Join-Path $Root "$OutDir\HelpButtonJirik-v$ver-win.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 Add-Type -AssemblyName System.IO.Compression

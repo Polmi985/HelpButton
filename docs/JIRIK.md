@@ -44,7 +44,8 @@ Na grafice se 6 GB (např. RTX 3050) běží Nízká celá v grafice (~45 token�
 
 ## Instalace na Windows
 
-1. Stáhni repozitář (nebo zip z Releases) a rozbal ho.
+1. Stáhni z [Releases](https://github.com/Polmi985/HelpButtonJirik/releases/latest) soubor
+   `HelpButtonJirik-v0.2.0-win.zip` a rozbal ho.
 2. Dvojklik na **`Setup.bat`**. Doinstaluje Python, Node.js a Ollamu (přes winget), knihovny, hlas Jirka,
    model pro úroveň Nízká, vytvoří `helpbutton.toml` a na ploše ikonu **Jiřík**.
 3. Spusť Jiříka ikonou na ploše nebo přes **`Jirik.bat`**. Když instalace ještě neproběhla, spustí se sama.

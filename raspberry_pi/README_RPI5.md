@@ -84,7 +84,7 @@ ssh pi@helpbutton.local
 ### Krok 4 – Stáhněte projekt
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/Polmi985/HelpButton.git
+git clone https://github.com/Polmi985/HelpButtonJirik.git HelpButton
 cd HelpButton
 ```
 ✅ **Kontrola:** `ls raspberry_pi/setup_rpi5.sh` vypíše název souboru.

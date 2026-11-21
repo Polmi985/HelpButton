@@ -1,5 +1,5 @@
 [project]
-name = "helpbutton"
+name = "helpbuttonjirik"
 version = "0.2.0"
 description = "Hlasové tlačítko s AI, které seniorům opraví telefon s Androidem nebo počítač s Windows, a místní chat Jiřík, který ovládá tento i další počítače v síti"
 readme = "README.md"

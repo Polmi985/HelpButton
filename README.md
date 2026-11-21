@@ -1,4 +1,4 @@
-# HelpButton – jedno tlačítko, které babičce opraví telefon
+# HelpButtonJirik – jedno tlačítko, které babičce opraví telefon, a Jiřík, který ovládá tvůj počítač
 
 **HelpButton** je hlasový pomocník pro seniory, který jen neradí, ale rovnou jedná. Senior zmáčkne fyzické
 tlačítko a řekne, co se děje („zmizel mi WhatsApp“, „je to moc malé, nevidím“, „vyskočilo mi okno
@@ -98,7 +98,9 @@ Podrobnosti o Jiříkovi jsou v [docs/JIRIK.md](docs/JIRIK.md).
 
 ### Windows jedním kliknutím (Jiřík + server tlačítka)
 
-1. Stáhněte repozitář a dvakrát klikněte na **`Setup.bat`**. Doinstaluje Python, Node.js, Ollamu, knihovny,
+1. Stáhněte z [Releases](https://github.com/Polmi985/HelpButtonJirik/releases/latest) soubor
+   `HelpButtonJirik-v0.2.0-win.zip`, rozbalte ho a dvakrát klikněte na **`Setup.bat`**.
+   Doinstaluje Python, Node.js, Ollamu, knihovny,
    hlas Jirka, model `qwen3.5:4b`, vytvoří `helpbutton.toml` a na ploše ikonu **Jiřík**.
 2. Spusťte **Jiřík** z plochy (nebo `Jirik.bat`). Bez aplikace jde i `Start Jirik.bat` – chat se otevře
    v prohlížeči.
@@ -110,8 +112,8 @@ Aplikace spustí server na portu 8765, takže na stejném počítači hned běž
 Potřebujete Python 3.11 nebo novější.
 
 ```powershell
-git clone https://github.com/Polmi985/HelpButton.git
-cd HelpButton
+git clone https://github.com/Polmi985/HelpButtonJirik.git
+cd HelpButtonJirik
 pip install -e ".[dev,claude,pc,jirik]"
 Copy-Item helpbutton.example.toml helpbutton.toml     # pak upravte [family] a [[contacts]]
 ```
