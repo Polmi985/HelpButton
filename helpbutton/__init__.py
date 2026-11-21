@@ -1,3 +1,3 @@
-"""HelpButton LAN – mozek na serveru, MCP svaly na zařízeních."""
+"""HelpButton – mozek na serveru (tlačítko pro seniora + chat Jiřík), MCP svaly na zařízeních."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

@@ -1,0 +1,7 @@
+// Stavová lišta „Jiřík pracuje“: tlačítka posílají povely hlavnímu procesu aplikace.
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("helpbutton", {
+  open: () => ipcRenderer.send("pill:open"),
+  stop: () => ipcRenderer.send("pill:stop"),
+});

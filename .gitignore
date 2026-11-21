@@ -5,12 +5,23 @@ __pycache__/
 .venv/
 venv/
 .env
+node_modules/
 
+# data běhu: logy, historie agenta, paměť, chat, cache
 data/
+
+# hlasové modely (stáhne Setup.bat)
 voices/
+
+# osobní nastavení a klíče
 helpbutton.toml
+helpbutton.user.toml
 raspberry_pi/rpi_button.toml
 raspberry_pi/.tts_cache/
+
+# sestavení
+dist/
+out/
 
 .vscode/
 .idea/

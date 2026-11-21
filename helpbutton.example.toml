@@ -1,4 +1,5 @@
-# Zkopírujte jako helpbutton.toml a upravte. Vše je volitelné.
+# Zkopírujte jako helpbutton.toml a upravte (Setup.bat to udělá sám). Vše je volitelné.
+# Jeden server obsluhuje tlačítko pro seniora (HelpButton) i chat Jiřík na tomto počítači.
 
 [helpbutton]
 senior_name = "Paní Jano"      # oslovení (5. pád)
@@ -58,8 +59,22 @@ whisper_compute_type = "auto"  # auto (int8 na CPU, float16 na CUDA) | int8 | fl
 whisper_beam_size = 1          # greedy dekódování (1 = nejrychlejší, ~0.4–1.0 s)
 whisper_warmup = true          # přednačíst a zahřát Whisper hned při startu serveru
 piper_bin = "piper"
-piper_model = ""               # např. "voices/cs_CZ-jirka-medium.onnx"
-speech_rate = 0.85
+piper_model = ""               # prázdné = voices/cs_CZ-jirka-medium.onnx (stáhne Setup.bat), pokud existuje
+speech_rate = 0.85             # hlas pro seniora (pomaleji); Jiřík má vlastní [jirik] speech_rate
+
+[jirik]                        # chat Jiřík na tomto počítači (http://127.0.0.1:8765/chat a aplikace Jiřík)
+# jméno a oslovení patří do helpbutton.user.toml (git ho ignoruje):  [jirik] user_name = "Adam"  greeting = "Adame"
+model = "qwen3.5:4b"           # úroveň Nízká; další úrovně myšlení se stahují v aplikaci (helpbutton/server/hardware.py)
+uncensored = "huihui_ai/qwen3.5-abliterated:4b"
+num_ctx = 8192                 # kontext chatu – mění se i v Nastavení aplikace
+keep_alive = "30m"
+speech_rate = 1.0
+warmup = true                  # při startu načíst model chatu do grafiky; false = jen tlačítko, šetří paměť grafiky
+
+[link]                         # Jiřík Link – ovládání dalších počítačů v síti (brána se otevře až po spárování)
+port = 8771                    # TLS brána pro spárované počítače
+udp_port = 8772                # probouzení spárovaných počítačů
+pair_port = 8773               # párovací stránka (jen během párování, max. 15 min)
 
 [notify]
 webhook_url = ""               # např. "https://ntfy.sh/helpbutton-rodina-nahodny-retezec" nebo HA webhook

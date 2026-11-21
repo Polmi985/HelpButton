@@ -31,6 +31,7 @@ class Device:
     status: dict[str, Any] = field(default_factory=dict)
     online: bool = False
     last_seen: float = 0.0
+    local: bool = False  # démon běží na stejném počítači jako server („Tento počítač“ pro Jiříka)
     send: Callable[[dict[str, Any]], Awaitable[None]] | None = None
 
     @property
@@ -49,6 +50,7 @@ class Device:
             "kind": self.kind,
             "platform": self.platform,
             "online": self.available,
+            "local": self.local,
             "last_seen": self.last_seen,
             "status": self.status,
             "tools": sorted(self.tools),
@@ -74,6 +76,7 @@ class Registry:
         dev.platform = hello.get("platform", dev.platform)
         dev.tools = {t["name"]: t for t in hello.get("tools", [])}
         dev.status = hello.get("status") or {}
+        dev.local = bool(hello.get("local", False))
         dev.online = True
         dev.last_seen = time.time()
         dev.send = send

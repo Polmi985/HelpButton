@@ -1,7 +1,7 @@
 [project]
 name = "helpbutton"
-version = "0.1.0"
-description = "Hlasové tlačítko s AI, které seniorům opraví telefon s Androidem nebo počítač s Windows přes domácí síť"
+version = "0.2.0"
+description = "Hlasové tlačítko s AI, které seniorům opraví telefon s Androidem nebo počítač s Windows, a místní chat Jiřík, který ovládá tento i další počítače v síti"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -20,13 +20,18 @@ dependencies = [
     "pydantic>=2.6",
     "zeroconf>=0.131",
     "pillow>=10.1",
+    "numpy>=1.26",
+    "cryptography>=42",          # certifikát a párování pro Jiřík Link
 ]
 
 [project.optional-dependencies]
 voice = ["faster-whisper>=1.0"]
+# Jiřík: hlas Jirka (Piper) běží přímo v serveru
+jirik = ["piper-tts>=1.2"]
 claude = ["anthropic>=0.60"]
 pc = [
     "mss>=9",
+    "psutil>=5.9",
     "pyautogui>=0.9.54",
     "pywinauto>=0.6.8; sys_platform == 'win32'",
     "winrt-runtime>=3; sys_platform == 'win32'",
@@ -44,7 +49,7 @@ include = ["helpbutton*"]
 
 [tool.setuptools.package-data]
 "helpbutton.server" = ["static/*"]
-"helpbutton" = ["skills/*/SKILL.md"]
+"helpbutton" = ["skills/*/SKILL.md", "link/install/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

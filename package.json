@@ -1,0 +1,14 @@
+{
+  "name": "helpbutton-jirik",
+  "productName": "Jiřík",
+  "version": "0.2.0",
+  "description": "Jiřík – desktopová aplikace projektu HelpButton: místní AI chat s hlasem, který ovládá tento i spárované počítače",
+  "main": "app/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.3.2"
+  }
+}

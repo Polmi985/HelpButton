@@ -64,6 +64,12 @@ TOOL_LEVELS: dict[str, Level] = {
     "shell_read": Level.GREEN,
     "execute_action": Level.ORANGE,
     "run_macro": Level.ORANGE,
+    # Jiřík (chat na počítači) – volá je přímo jeho chat, ne GUI agent ani plánovač tlačítka pro seniora
+    "desktop_view": Level.GREEN,
+    "desktop_act": Level.ORANGE,
+    "keyboard": Level.ORANGE,
+    "open_target": Level.ORANGE,
+    "run_powershell": Level.ORANGE,
 }
 
 AGENT_FORBIDDEN_TOOLS = frozenset(
@@ -76,6 +82,12 @@ AGENT_FORBIDDEN_TOOLS = frozenset(
         "run_macro",
         "get_ui_tree",
         "take_screenshot",
+        # nástroje Jiříka: senior je nedostane (PowerShell, volná myš a klávesnice)
+        "desktop_view",
+        "desktop_act",
+        "keyboard",
+        "open_target",
+        "run_powershell",
     }
 )
 

@@ -127,7 +127,7 @@ def youtube(text: str, kind: str) -> Routine | None:
         await say(f"Pouštím „{v['title'][:70]}“.")
         try:
             r = await call(opener, {"url": v["url"]})
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             return RoutineResult(False, "Video se nepodařilo otevřít.", [f"found video {v['url']}"])
         window = str((r or {}).get("window", "")) if isinstance(r, dict) else ""
         log.info("YouTube: %s (%s) → okno %r", v["title"], v.get("channel"), window[:80])

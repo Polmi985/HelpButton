@@ -14,12 +14,13 @@ from .config import load_config
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="HelpButton LAN – orchestrátor (mozek)")
+    p = argparse.ArgumentParser(description="HelpButton – tlačítko pro seniora a chat Jiřík (jeden server)")
     p.add_argument("--config", help="cesta k helpbutton.toml")
     p.add_argument("--port", type=int)
     p.add_argument("--llm", help="porozumění větám: auto | claude | ollama | gemini | keywords")
     p.add_argument("--vlm", help="GUI agent: auto | claude | gemini | ollama | none")
     p.add_argument("--no-mdns", action="store_true")
+    p.add_argument("--local", action="store_true", help="poslouchat jen na 127.0.0.1 (desktopová aplikace Jiřík)")
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument(
         "--api-key",
@@ -57,7 +58,15 @@ def main() -> None:
             )
     if a.no_mdns:
         cfg.mdns = False
-    uvicorn.run(create_app(cfg), host=cfg.host, port=cfg.port, log_level="info")
+    if a.local:
+        cfg.host = "127.0.0.1"
+    uvicorn.run(
+        create_app(cfg),
+        host=cfg.host,
+        port=cfg.port,
+        log_level="info" if a.verbose else "warning",
+        ws_max_size=16 * 1024 * 1024,
+    )
 
 
 if __name__ == "__main__":

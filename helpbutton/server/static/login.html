@@ -94,7 +94,7 @@ $("f").onsubmit = async ev => {
                                           body: JSON.stringify({ key }) });
     if (r.ok) {
       const next = new URLSearchParams(location.search).get("next");
-      location.replace(next === "/button" ? "/button" : "/");
+      location.replace(["/button", "/chat"].includes(next) ? next : "/");
       return;
     }
     const j = await r.json().catch(() => ({}));

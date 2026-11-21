@@ -528,6 +528,66 @@ class MockPc(MockScreen, DeviceAgent):
         self.actions.append("fix_sound")
         return {"volume": 70, "muted": False}
 
+    # --- nástroje chatu Jiřík (myš a klávesnice „jako člověk“, PowerShell) ---------------------
+    @tool("Snímek obrazovky pro práci myší (souřadnice 0–1000).")
+    async def desktop_view(self, marks: bool = True) -> dict[str, Any]:
+        obs = await self.observe_screen()
+        w, h = self.size
+        return {
+            "image_webp_base64": obs["screenshot_webp_base64"],
+            "screen": [w, h],
+            "active_window": self.screen,
+            "cursor": [500, 500],
+            "elements": [
+                {
+                    "id": e["id"],
+                    "label": e["label"],
+                    "kind": e.get("kind", "Button"),
+                    "at": [
+                        round((e["bounds"][0] + e["bounds"][2]) / 2 * 1000 / w),
+                        round((e["bounds"][1] + e["bounds"][3]) / 2 * 1000 / h),
+                    ],
+                }
+                for e in (el.public(1.0) for el in self._current())
+            ],
+            "open_windows": [self.screen],
+            "text": list(SCREEN_TEXT.get(self.screen, [])),
+        }
+
+    @tool("Myš a klávesnice jako člověk (simulace).")
+    async def desktop_act(
+        self,
+        action: str,
+        x: int = -1,
+        y: int = -1,
+        to_x: int = -1,
+        to_y: int = -1,
+        element: int = 0,
+        text: str = "",
+        keys: str = "",
+        direction: str = "down",
+        amount: int = 3,
+        look: bool = True,
+    ) -> dict[str, Any]:
+        await asyncio.sleep(self.delay)
+        self.actions.append(f"desktop_act {action}")
+        return {"done": action, "label": ""}
+
+    @tool("Stiskne klávesu nebo napíše text (simulace).")
+    async def keyboard(self, keys: str = "", text: str = "") -> dict[str, Any]:
+        self.actions.append(f"keyboard {keys or text}")
+        return {"done": True}
+
+    @tool("Otevře adresu, soubor nebo aplikaci (simulace).")
+    async def open_target(self, target: str) -> dict[str, Any]:
+        self.opened.append(target)
+        return {"opened": target}
+
+    @tool("PowerShell (simulace – nic nespustí).")
+    async def run_powershell(self, script: str, timeout: int = 60) -> dict[str, Any]:
+        self.actions.append("run_powershell")
+        return {"exit_code": 0, "output": "(simulace)", "seconds": 0.0}
+
 
 def main() -> None:
     p = argparse.ArgumentParser(description="HelpButton – simulovaná zařízení")

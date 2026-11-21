@@ -1,4 +1,9 @@
-"""Konfigurace serveru (helpbutton.toml). Vše má rozumné výchozí hodnoty."""
+"""Konfigurace serveru (helpbutton.toml + osobní helpbutton.user.toml). Vše má rozumné výchozí hodnoty.
+
+Jeden server obsluhuje obě části projektu:
+  * HelpButton – tlačítko pro seniora (sekce [helpbutton], [family], [llm], [vlm], [voice] …),
+  * Jiřík – chat na počítači, který ovládá tento i spárované počítače (sekce [jirik] a [link]).
+"""
 
 from __future__ import annotations
 
@@ -136,10 +141,26 @@ class Config:
     whisper_threads: int = 0
     whisper_warmup: bool = True
     piper_bin: str = "piper"
-    piper_model: str = ""
-    speech_rate: float = 0.85
+    piper_model: str = ""                     # prázdné = voices/cs_CZ-jirka-medium.onnx, pokud existuje
+    speech_rate: float = 0.85                 # hlas pro seniora (pomaleji)
 
     notify_webhook: str = ""
+
+    # Jiřík – chat na počítači (/chat a desktopová aplikace)
+    user_name: str = ""                       # jméno uživatele (1. pád)
+    greeting: str = ""                        # oslovení v 5. pádě („Adame“); prázdné = jméno
+    user_female: bool = False
+    model: str = "qwen3.5:4b"                 # Qwen3.5 4B: text + obrázky + nástroje, vejde se do 6 GB grafiky
+    model_uncensored: str = "huihui_ai/qwen3.5-abliterated:4b"
+    num_ctx: int = 8192                       # stejný kontext pro chat i jeho agenta – Ollama model nepřenačítá
+    keep_alive: str = "30m"
+    chat_speech_rate: float = 1.0             # Jiřík mluví běžnou rychlostí
+    chat_warmup: bool = True                  # při startu načíst model chatu do grafiky (je-li stažený)
+
+    # Jiřík Link – ovládání dalších počítačů v síti
+    link_port: int = 8771                     # TLS brána pro vzdálené počítače
+    link_udp_port: int = 8772                 # probouzení vzdálených počítačů
+    pair_port: int = 8773                     # párovací stránka (jen během párování, max. 15 min)
 
     def g(self, female: str, male: str) -> str:
         """Tvar slova podle rodu seniora."""
@@ -209,6 +230,7 @@ def _contact(d: dict[str, Any]) -> Contact:
 def load_config(path: str | os.PathLike | None = None) -> Config:
     cfg = Config()
     p = Path(path or os.environ.get("HELPBUTTON_CONFIG", "helpbutton.toml"))
+    base = p.resolve().parent
     if p.exists():
         raw = tomllib.loads(p.read_text(encoding="utf-8"))
         a = raw.get("helpbutton", {})
@@ -261,11 +283,52 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         cfg.piper_model = v.get("piper_model", cfg.piper_model)
         cfg.speech_rate = float(v.get("speech_rate", cfg.speech_rate))
         cfg.notify_webhook = raw.get("notify", {}).get("webhook_url", cfg.notify_webhook)
+        _load_jirik(cfg, raw.get("jirik", {}))
+        lk = raw.get("link", {})
+        cfg.link_port = int(lk.get("port", cfg.link_port))
+        cfg.link_udp_port = int(lk.get("udp_port", cfg.link_udp_port))
+        cfg.pair_port = int(lk.get("pair_port", cfg.pair_port))
+        if not cfg.data_dir.is_absolute():
+            cfg.data_dir = base / cfg.data_dir
         for key, env in (("gemini_api_key", "GEMINI_API_KEY"), ("anthropic_api_key", "ANTHROPIC_API_KEY")):
             value = str(raw.get("keys", {}).get(key, "")).strip()
             if value and not os.environ.get(env):
                 os.environ[env] = value
+    # osobní nastavení Jiříka (jméno, oslovení…) mimo git: helpbutton.user.toml vedle helpbutton.toml
+    user = p.with_name("helpbutton.user.toml")
+    if user.exists():
+        _load_jirik(cfg, tomllib.loads(user.read_text(encoding="utf-8")).get("jirik", {}))
+    if not cfg.piper_model and (base / "voices" / "cs_CZ-jirka-medium.onnx").exists():
+        cfg.piper_model = str(base / "voices" / "cs_CZ-jirka-medium.onnx")
+    elif cfg.piper_model and not Path(cfg.piper_model).is_absolute() and p.exists():
+        cfg.piper_model = str(base / cfg.piper_model)
     cfg.token = os.environ.get("HELPBUTTON_TOKEN", cfg.token)
     cfg.llm_provider = os.environ.get("HELPBUTTON_LLM", cfg.llm_provider)
     cfg.vlm_provider = os.environ.get("HELPBUTTON_VLM", cfg.vlm_provider)
     return cfg
+
+
+def _load_jirik(cfg: Config, j: dict[str, Any]) -> None:
+    cfg.user_name = str(j.get("user_name", cfg.user_name) or "")
+    cfg.greeting = str(j.get("greeting", cfg.greeting) or "")
+    cfg.user_female = bool(j.get("user_female", cfg.user_female))
+    cfg.model = str(j.get("model", cfg.model))
+    cfg.model_uncensored = str(j.get("uncensored", cfg.model_uncensored))
+    cfg.num_ctx = int(j.get("num_ctx", cfg.num_ctx))
+    cfg.keep_alive = str(j.get("keep_alive", cfg.keep_alive))
+    cfg.chat_speech_rate = float(j.get("speech_rate", cfg.chat_speech_rate))
+    cfg.chat_warmup = bool(j.get("warmup", cfg.chat_warmup))
+    if j.get("home_city") and not cfg.home_city:
+        cfg.home_city = str(j["home_city"])
+
+
+def chat_config(cfg: Config) -> Config:
+    """Kopie nastavení pro Jiříka. Chat mění model a kontext za běhu (úrovně myšlení v Nastavení) –
+    na kopii to neovlivní GUI agenta tlačítka pro seniora."""
+    import dataclasses
+
+    c = dataclasses.replace(cfg)
+    c.ollama_vlm_model = c.model
+    c.ollama_vlm_num_ctx = c.num_ctx
+    c.speech_rate = c.chat_speech_rate
+    return c

@@ -3,7 +3,6 @@
 Volá se z vlákna (`asyncio.to_thread`) – všechno je synchronní.
 Bezpečnostní pojistka pyautogui: rychlé najetí myší do rohu obrazovky akci přeruší.
 """
-
 from __future__ import annotations
 
 import ctypes
@@ -17,20 +16,8 @@ from ..common import som
 log = logging.getLogger("helpbutton.pc.gui")
 WIN = sys.platform.startswith("win")
 
-INTERACTIVE = {
-    "Button",
-    "Edit",
-    "Hyperlink",
-    "MenuItem",
-    "ListItem",
-    "TabItem",
-    "CheckBox",
-    "ComboBox",
-    "RadioButton",
-    "TreeItem",
-    "SplitButton",
-    "DataItem",
-}
+INTERACTIVE = {"Button", "Edit", "Hyperlink", "MenuItem", "ListItem", "TabItem", "CheckBox", "ComboBox",
+               "RadioButton", "TreeItem", "SplitButton", "DataItem"}
 
 _dpi_done = False
 
@@ -47,6 +34,7 @@ def dpi_aware() -> None:
         return
     _dpi_done = True
     try:
+        # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4 (Windows 10 1703+): správně i dialogy a podokna
         if ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
             return
     except (AttributeError, OSError):
@@ -62,7 +50,7 @@ def dpi_aware() -> None:
         pass
 
 
-dpi_aware()
+dpi_aware()   # dřív než cokoli importuje pyautogui / pywinauto
 
 
 def foreground_title() -> str:
@@ -139,14 +127,10 @@ def monitor_count() -> int:
 
 PRIO_POPUP, PRIO_TASKBAR, PRIO_DOCUMENT, PRIO_WINDOW = 3, 2, 1, 0
 
+# UI Automation – vlastnosti prvků (čtou se levně, bez vzorů/patterns). Vlastnost vzoru, který prvek
+# nepodporuje, vrací výchozí hodnotu (např. „nezaškrtnuto“) – proto se nejdřív ptáme, jestli vzor má.
 _UIA_HAS_FOCUS, _UIA_IS_PASSWORD, _UIA_VALUE, _UIA_EXPANDED, _UIA_SELECTED, _UIA_TOGGLE = (
-    30008,
-    30019,
-    30045,
-    30070,
-    30079,
-    30086,
-)
+    30008, 30019, 30045, 30070, 30079, 30086)
 _UIA_HAS_EXPAND, _UIA_HAS_SELECTION_ITEM, _UIA_HAS_TOGGLE, _UIA_HAS_VALUE = 30028, 30036, 30041, 30043
 TEXT_TYPES = {"Text", "Header", "HeaderItem", "TitleBar", "StatusBar", "ToolTip"}
 
@@ -162,11 +146,9 @@ def _state(info, ct: str) -> tuple[str, bool]:  # noqa: ANN001
     """Stav prvku pro model: zaškrtnuto, rozbaleno, vybráno, hodnota pole, fokus. Vrací (text, heslo)."""
     bits: list[str] = []
     password = bool(_prop(info, _UIA_IS_PASSWORD)) if ct in ("Edit", "ComboBox") else False
-    if ct in ("CheckBox", "RadioButton", "MenuItem", "Button", "ListItem", "TreeItem", "DataItem") and _prop(
-        info, _UIA_HAS_TOGGLE
-    ):
+    if ct in ("CheckBox", "RadioButton", "MenuItem", "Button", "ListItem", "TreeItem", "DataItem")             and _prop(info, _UIA_HAS_TOGGLE):
         tog = _prop(info, _UIA_TOGGLE)
-        if ct == "Button":
+        if ct == "Button":                       # přepínací tlačítka (Start, Hledat): jen když je stisknuté
             if tog == 1:
                 bits.append("pressed")
         elif tog in (0, 1):
@@ -175,11 +157,7 @@ def _state(info, ct: str) -> tuple[str, bool]:  # noqa: ANN001
         exp = _prop(info, _UIA_EXPANDED)
         if exp in (0, 1):
             bits.append("expanded" if exp == 1 else "collapsed")
-    if (
-        ct in ("ListItem", "TabItem", "RadioButton", "DataItem", "TreeItem")
-        and _prop(info, _UIA_HAS_SELECTION_ITEM)
-        and _prop(info, _UIA_SELECTED) is True
-    ):
+    if ct in ("ListItem", "TabItem", "RadioButton", "DataItem", "TreeItem") and _prop(info, _UIA_HAS_SELECTION_ITEM)             and _prop(info, _UIA_SELECTED) is True:
         bits.append("selected")
     if ct in ("Edit", "ComboBox") and not password and _prop(info, _UIA_HAS_VALUE):
         val = _prop(info, _UIA_VALUE)
@@ -190,11 +168,17 @@ def _state(info, ct: str) -> tuple[str, bool]:  # noqa: ANN001
     return (", " + ", ".join(bits) if bits else ""), password
 
 
-def ui_elements(
-    monitor: tuple[int, int, int, int], budget_s: float = 4.0, limit: int = 250
-) -> list[som.Element]:
+def ui_elements(monitor: tuple[int, int, int, int], budget_s: float = 4.0, limit: int = 250) -> list[som.Element]:
     return ui_snapshot(monitor, budget_s, limit)[0]
 
+
+# --- OCR: nápisy ze snímku obrazovky (vestavěné OCR Windows 10/11) ------------------------------
+#
+# UI Automation nevidí všechno: Chrome bez čtečky obrazovky nepustí ven obsah stránky (živě: model
+# viděl na snímku video, v seznamu prvků měl jen „Vyhledávání v kartách“), některé aplikace (hry, Java,
+# Electron, vlastní kreslené ovládání) nemají strom prvků vůbec. OCR přečte každý viditelný nápis
+# i s polohou – v jakékoli aplikaci – a nápis dostane číslo jako tlačítko. Model pak nehádá souřadnice.
+# Běží lokálně (Windows.Media.Ocr), bez instalace navíc: jen pip balíčky winrt-* z extra „pc“.
 
 OCR_MAX_SEGMENTS = 80
 _ocr_engine = None
@@ -223,7 +207,7 @@ def _engine():  # noqa: ANN202
         if _ocr_engine is None:
             raise RuntimeError("Windows nemají žádný jazyk pro OCR")
         log.info("OCR: %s", _ocr_engine.recognizer_language.language_tag)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 – bez OCR agent jede dál jen s UI Automation
         _ocr_failed = True
         log.info("OCR není k dispozici (%s) – pip install -e .[pc]", e)
     return _ocr_engine
@@ -269,9 +253,8 @@ def ocr_lines(image) -> list[list[tuple[str, tuple[int, int, int, int]]]]:  # no
     r, g, b, a = img.split()
     writer = DataWriter()
     writer.write_bytes(_bgra(r, g, b, a))
-    bmp = SoftwareBitmap.create_copy_from_buffer(
-        writer.detach_buffer(), BitmapPixelFormat.BGRA8, img.width, img.height, BitmapAlphaMode.PREMULTIPLIED
-    )
+    bmp = SoftwareBitmap.create_copy_from_buffer(writer.detach_buffer(), BitmapPixelFormat.BGRA8, img.width,
+                                                 img.height, BitmapAlphaMode.PREMULTIPLIED)
     fx, fy = image.width / img.width, image.height / img.height
 
     async def go():  # noqa: ANN202
@@ -283,17 +266,8 @@ def ocr_lines(image) -> list[list[tuple[str, tuple[int, int, int, int]]]]:  # no
         words = []
         for w in line.words:
             rc = w.bounding_rect
-            words.append(
-                (
-                    str(w.text),
-                    (
-                        round(rc.x * fx),
-                        round(rc.y * fy),
-                        round((rc.x + rc.width) * fx),
-                        round((rc.y + rc.height) * fy),
-                    ),
-                )
-            )
+            words.append((str(w.text), (round(rc.x * fx), round(rc.y * fy), round((rc.x + rc.width) * fx),
+                                        round((rc.y + rc.height) * fy))))
         if words:
             out.append(words)
     return out
@@ -305,9 +279,7 @@ def _bgra(r, g, b, a) -> bytes:  # noqa: ANN001
     return Image.merge("RGBA", (b, g, r, a)).tobytes()
 
 
-def ocr_segments(
-    lines: list[list[tuple[str, tuple[int, int, int, int]]]],
-) -> list[tuple[str, tuple[int, int, int, int]]]:
+def ocr_segments(lines: list[list[tuple[str, tuple[int, int, int, int]]]]) -> list[tuple[str, tuple[int, int, int, int]]]:
     """Řádky OCR → klikatelné nápisy. OCR spojí do jednoho řádku i položky lišty vedle sebe
     („Soubor Domů Vložení Návrh“) – rozdělí se tam, kde je mezi slovy velká mezera."""
     segs = []
@@ -327,41 +299,24 @@ def ocr_segments(
         text = " ".join(t for t, _b in seg).strip()
         letters = sum(c.isalpha() for c in text)
         if letters < 2 or sum(c.isalnum() for c in text) < 0.5 * len(text.replace(" ", "")):
-            continue
-        out.append(
-            (
-                text,
-                (
-                    min(b[0] for _t, b in seg),
-                    min(b[1] for _t, b in seg),
-                    max(b[2] for _t, b in seg),
-                    max(b[3] for _t, b in seg),
-                ),
-            )
-        )
+            continue                                # „•“, „»>“, zbytky ikon – žádný nápis
+        out.append((text, (min(b[0] for _t, b in seg), min(b[1] for _t, b in seg),
+                           max(b[2] for _t, b in seg), max(b[3] for _t, b in seg))))
     return out
 
 
-def merge_ocr(
-    elements: list[som.Element],
-    segments: list[tuple[str, tuple[int, int, int, int]]],
-    limit: int = OCR_MAX_SEGMENTS,
-    focus: tuple[int, int, int, int] | None = None,
-) -> list[som.Element]:
+def merge_ocr(elements: list[som.Element], segments: list[tuple[str, tuple[int, int, int, int]]],
+              limit: int = OCR_MAX_SEGMENTS, focus: tuple[int, int, int, int] | None = None) -> list[som.Element]:
     """Přidá k prvkům UI Automation nápisy z OCR, které v nich ještě nejsou (sloučení jako Microsoft UFO2).
 
     Nápis uvnitř malého prvku (tlačítko „Tisknout“, řádek souboru) patří tomu prvku – nepřidává se.
     Nápis jinde (obsah webové stránky, plátno aplikace bez stromu prvků) dostane vlastní číslo."""
     from ..common.safety import redact_codes
 
-    if focus:
+    if focus:                                       # nejdřív nápisy z okna v popředí, pak zbytek obrazovky
         fx1, fy1, fx2, fy2 = focus
-        segments = sorted(
-            segments,
-            key=lambda s: not (
-                fx1 <= (s[1][0] + s[1][2]) // 2 <= fx2 and fy1 <= (s[1][1] + s[1][3]) // 2 <= fy2
-            ),
-        )
+        segments = sorted(segments, key=lambda s: not (fx1 <= (s[1][0] + s[1][2]) // 2 <= fx2
+                                                       and fy1 <= (s[1][1] + s[1][3]) // 2 <= fy2))
     added: list[som.Element] = []
     for text, (x1, y1, x2, y2) in segments:
         cx, cy, h = (x1 + x2) // 2, (y1 + y2) // 2, max(1, y2 - y1)
@@ -370,15 +325,9 @@ def merge_ocr(
             continue
         label = redact_codes(" ".join(text.split()))[:70]
         in_focus = bool(focus) and focus[0] <= cx <= focus[2] and focus[1] <= cy <= focus[3]
-        added.append(
-            som.Element(
-                0,
-                f"{label} (Text, OCR)",
-                (x1, y1, x2, y2),
-                "text",
-                priority=PRIO_DOCUMENT if in_focus else PRIO_WINDOW,
-            )
-        )
+        # obsah okna v popředí je jako obsah stránky – limit prvků nesmí vyčerpat rám okna a lišty
+        added.append(som.Element(0, f"{label} (Text, OCR)", (x1, y1, x2, y2), "text",
+                                 priority=PRIO_DOCUMENT if in_focus else PRIO_WINDOW))
         if len(added) >= limit:
             break
     return elements + added
@@ -390,13 +339,8 @@ def _same_text(a: str, label: str) -> bool:
     return bool(wa) and len(wa & wb) >= max(1, len(wa) // 2)
 
 
-def ui_snapshot(
-    monitor: tuple[int, int, int, int],
-    budget_s: float = 4.0,
-    limit: int = 250,
-    text_limit: int = 50,
-    numbered: bool = True,
-) -> tuple[list[som.Element], list[str]]:
+def ui_snapshot(monitor: tuple[int, int, int, int], budget_s: float = 4.0, limit: int = 250,
+                text_limit: int = 50, numbered: bool = True) -> tuple[list[som.Element], list[str]]:
     """Klikatelné prvky a viditelné texty aktivního okna přes UI Automation (časově omezené).
 
     Pořadí procházení: otevřená menu → hlavní panel → obsah webové stránky (Document) → zbytek okna.
@@ -418,16 +362,17 @@ def ui_snapshot(
     ox, oy, w, h = monitor
     deadline = time.time() + budget_s
     out: list[som.Element] = []
-    texts: list[tuple[int, int, int, str]] = []
+    texts: list[tuple[int, int, int, str]] = []     # (priorita, y, x, text)
     seen_text: set[str] = set()
     user32 = ctypes.windll.user32
     queues: dict[int, deque] = {p: deque() for p in (PRIO_POPUP, PRIO_TASKBAR, PRIO_DOCUMENT, PRIO_WINDOW)}
+    # 1) otevřená menu a vyskakovací okna (kontextové menu, podmenu „Zobrazit“, rozbalovací seznamy)
+    #    jsou samostatná okna – bez nich by agent musel hádat souřadnice položek a menu by se zavřelo
     for p in _popup_roots(UIAElementInfo):
         queues[PRIO_POPUP].append(p)
-    for hwnd, prio in (
-        (user32.FindWindowW("Shell_TrayWnd", None), PRIO_TASKBAR),
-        (user32.GetForegroundWindow(), PRIO_WINDOW),
-    ):
+    # 2) hlavní panel (Start, hledání, síť, hlasitost), 3) aktivní okno
+    for hwnd, prio in ((user32.FindWindowW("Shell_TrayWnd", None), PRIO_TASKBAR),
+                       (user32.GetForegroundWindow(), PRIO_WINDOW)):
         try:
             if hwnd:
                 queues[prio].append(UIAElementInfo(hwnd))
@@ -458,7 +403,7 @@ def ui_snapshot(
                 x1, y1, x2, y2 = r.left - ox, r.top - oy, r.right - ox, r.bottom - oy
                 x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
                 if x2 - x1 < 6 or y2 - y1 < 6:
-                    continue
+                    continue                              # mimo obrazovku (odscrollovaný obsah stránky)
                 if is_text:
                     t = " ".join((c.name or "").split())[:160]
                     if len(t) >= 2 and t.lower() not in seen_text and len(texts) < text_limit * 2:
@@ -466,17 +411,15 @@ def ui_snapshot(
                         texts.append((child_prio, y1, x1, t))
                     continue
                 name = " ".join((c.name or c.automation_id or ct).split())[:60]
-                kind = (
-                    "input"
-                    if ct in ("Edit", "ComboBox")
-                    else "switch" if ct in ("CheckBox", "RadioButton") else "button"
-                )
+                kind = "input" if ct in ("Edit", "ComboBox") else "switch" if ct in ("CheckBox", "RadioButton") \
+                    else "button"
                 state, pw = _state(c, ct)
                 pw = pw or (ct == "Edit" and any(k in name.lower() for k in ("heslo", "password", "pin")))
                 label = f"{name} ({ct}{', open menu' if in_popup else ''}{state})"
                 out.append(som.Element(0, label, (x1, y1, x2, y2), kind, pw, priority=child_prio))
             except Exception:  # noqa: BLE001
                 continue
+    # texty: nejdřív dialogy a menu, pak shora dolů jako se čte stránka; popisky tlačítek už model má
     labels = {e.label.split(" (")[0].lower() for e in out}
     texts.sort(key=lambda t: (-t[0], t[1] // 12, t[2]))
     screen_text = [t for _p, _y, _x, t in texts if t.lower() not in labels][:text_limit]
@@ -485,8 +428,7 @@ def ui_snapshot(
 
 def _taskbar_windows(limit: int = 40) -> list[tuple[int, str, str]]:
     """(hwnd, titulek, třída) oken, která senior vidí na hlavním panelu – bez skrytých (cloaked) oken
-    aplikací z Microsoft Store („Settings“, „Realtek Audio Console“ visí v systému neviditelně) a nástrojových oken.
-    """
+    aplikací z Microsoft Store („Settings“, „Realtek Audio Console“ visí v systému neviditelně) a nástrojových oken."""
     from ctypes import wintypes
 
     user32 = ctypes.windll.user32
@@ -503,12 +445,8 @@ def _taskbar_windows(limit: int = 40) -> list[tuple[int, str, str]]:
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def cb(hwnd, _lparam):  # noqa: ANN001, ANN202
-        if (
-            user32.IsWindowVisible(hwnd)
-            and not user32.GetWindow(hwnd, GW_OWNER)
-            and not user32.GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW
-            and not cloaked(hwnd)
-        ):
+        if (user32.IsWindowVisible(hwnd) and not user32.GetWindow(hwnd, GW_OWNER)
+                and not user32.GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW and not cloaked(hwnd)):
             n = user32.GetWindowTextLengthW(hwnd)
             if n:
                 buf = ctypes.create_unicode_buffer(n + 1)
@@ -556,6 +494,7 @@ def best_window(want: str, titles: list[str]) -> int | None:
     return best[1] if best[0] > 0 else None
 
 
+# Průzkumník má v titulku jen název složky („Plocha“, „zolty“) – model ale chce „File Explorer“.
 _EXPLORER = re.compile(r"explor|pruzkum|spravce soubor|file manager|slozk")
 
 
@@ -571,13 +510,12 @@ def focus_window(title_part: str) -> str:
     if i is None and _EXPLORER.search(normalize(title_part)):
         i = next((k for k, (_, _, cls) in enumerate(windows) if cls == "CabinetWClass"), None)
     if i is None:
-        raise ValueError(
-            f"okno „{title_part}“ není otevřené; otevřená okna: "
-            + (" | ".join(dict.fromkeys(t[:50] for _, t, _ in windows[:10])) or "žádná")
-        )
+        raise ValueError(f"okno „{title_part}“ není otevřené; otevřená okna: "
+                         + (" | ".join(dict.fromkeys(t[:50] for _, t, _ in windows[:10])) or "žádná"))
     hwnd = windows[i][0]
     if user32.IsIconic(hwnd):
-        user32.ShowWindow(hwnd, 9)
+        user32.ShowWindow(hwnd, 9)                    # SW_RESTORE
+    # Windows nedovolí procesu na pozadí převzít popředí – krátký stisk Alt to odemkne
     user32.keybd_event(0x12, 0, 0, 0)
     user32.keybd_event(0x12, 0, 2, 0)
     user32.SetForegroundWindow(hwnd)
@@ -585,17 +523,10 @@ def focus_window(title_part: str) -> str:
     return foreground_title()
 
 
-POPUP_CLASSES = {
-    "#32768",
-    "Xaml_WindowedPopupClass",
-    "PopupHost",
-    "DropDown",
-    "ComboLBox",
-    "Microsoft.UI.Content.PopupWindowSiteBridge",
-    "Microsoft.UI.Content.DesktopChildSiteBridge",
-    "XamlExplorerHostIslandWindow",
-    "XamlExplorerHostIslandWindow_WASDK",
-}
+POPUP_CLASSES = {"#32768", "Xaml_WindowedPopupClass", "PopupHost", "DropDown", "ComboLBox",
+                 "Microsoft.UI.Content.PopupWindowSiteBridge", "Microsoft.UI.Content.DesktopChildSiteBridge",
+                 # Windows 11: nové kontextové menu plochy a průzkumníka (XAML ostrůvek ve Windows App SDK)
+                 "XamlExplorerHostIslandWindow", "XamlExplorerHostIslandWindow_WASDK"}
 
 
 def _is_popup_class(cls: str) -> bool:
@@ -636,13 +567,17 @@ def _popup_roots(info_cls) -> list:  # noqa: ANN001
     return roots
 
 
+# --- ruce ------------------------------------------------------------------------------
+
 def click(x: int, y: int, double: bool = False, right: bool = False, hover_s: float = 0.12) -> None:
     import pyautogui
 
     dpi_aware()
+    # Skok přímo na cíl: plynulý pohyb po diagonále přejížděl přes jiné položky menu
+    # a zavíral otevřené podmenu („Zobrazit“ → „Zobrazit ikony na ploše“) dřív, než se kliklo.
     pyautogui.moveTo(x, y, duration=0)
     if hover_s > 0:
-        time.sleep(hover_s)
+        time.sleep(hover_s)                        # menu zaregistruje najetí myši na položku
     if right:
         pyautogui.rightClick()
     elif double:
@@ -651,32 +586,114 @@ def click(x: int, y: int, double: bool = False, right: bool = False, hover_s: fl
         pyautogui.click()
 
 
-KEY_ALIASES = {
-    "plus": "add",
-    "minus": "subtract",
-    "-": "subtract",
-    "escape": "esc",
-    "return": "enter",
-    "windows": "win",
-    "super": "win",
-    "cmd": "win",
-    "meta": "win",
-    "control": "ctrl",
-    "del": "delete",
-    "pgdn": "pagedown",
-    "pgup": "pageup",
-    "page_down": "pagedown",
-    "page_up": "pageup",
-    "arrowdown": "down",
-    "arrowup": "up",
-    "arrowleft": "left",
-    "arrowright": "right",
-    "spacebar": "space",
-    "backspace": "backspace",
-    "bksp": "backspace",
-    "ins": "insert",
-    "option": "alt",
-}
+def move(x: int, y: int, duration: float = 0.25) -> None:
+    import pyautogui
+
+    dpi_aware()
+    pyautogui.moveTo(x, y, duration=duration, tween=pyautogui.easeInOutQuad)
+
+
+def activate_at(x: int, y: int) -> bool:
+    """Okno pod bodem dá do popředí. Neaktivní okno jinak „spolkne“ první klik/tah jen na svou aktivaci
+    (živě: v Malování se první čára nenakreslila). Vrací True, když se okno muselo přepnout."""
+    if not WIN:
+        return False
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.GetAncestor.restype = wintypes.HWND
+    hwnd = user32.WindowFromPoint(wintypes.POINT(int(x), int(y)))
+    root = user32.GetAncestor(hwnd, 2) if hwnd else None          # GA_ROOT
+    fg = user32.GetForegroundWindow()
+    if not root or root == fg:
+        return False
+    cls = ctypes.create_unicode_buffer(64)
+    user32.GetClassNameW(root, cls, 64)
+    if cls.value in ("Shell_TrayWnd", "Progman", "WorkerW") or _is_popup_class(cls.value):
+        return False                                   # hlavní panel, plocha a menu se aktivují samy
+    user32.keybd_event(0x12, 0, 0, 0)                  # Alt odemkne převzetí popředí procesem na pozadí
+    user32.keybd_event(0x12, 0, 2, 0)
+    user32.SetForegroundWindow(root)
+    time.sleep(0.25)
+    return True
+
+
+def drag(x1: int, y1: int, x2: int, y2: int, button: str = "left", duration: float = 0.6) -> None:
+    """Přetažení jako člověk: stisk, plynulý pohyb, puštění (okna, soubory, posuvníky, výběr textu)."""
+    import pyautogui
+
+    dpi_aware()
+    activate_at(x1, y1)
+    pyautogui.moveTo(x1, y1, duration=0.15)
+    time.sleep(0.08)
+    pyautogui.mouseDown(button=button)
+    time.sleep(0.12)
+    pyautogui.moveTo(x2, y2, duration=duration, tween=pyautogui.easeInOutQuad)
+    time.sleep(0.12)
+    pyautogui.mouseUp(button=button)
+
+
+def button(down: bool, button: str = "left") -> None:
+    import pyautogui
+
+    (pyautogui.mouseDown if down else pyautogui.mouseUp)(button=button)
+
+
+def middle_click(x: int, y: int) -> None:
+    import pyautogui
+
+    dpi_aware()
+    pyautogui.moveTo(x, y, duration=0)
+    pyautogui.middleClick()
+
+
+def cursor() -> tuple[int, int]:
+    import pyautogui
+
+    p = pyautogui.position()
+    return int(p[0]), int(p[1])
+
+
+def scroll_by(clicks: int, horizontal: bool = False, at: tuple[int, int] | None = None) -> None:
+    import pyautogui
+
+    if at:
+        pyautogui.moveTo(*at, duration=0.12)
+    (pyautogui.hscroll if horizontal else pyautogui.scroll)(int(clicks) * 120)
+
+
+def screen_locked() -> bool:
+    """Zamčená obrazovka (nebo UAC): vstupní plocha není „Default“ – myš ani klávesnice tam nedosáhnou."""
+    if not WIN:
+        return False
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    h = user32.OpenInputDesktop(0, False, 0x0100)          # DESKTOP_READOBJECTS
+    if not h:
+        return True
+    try:
+        buf = ctypes.create_unicode_buffer(64)
+        need = wintypes.DWORD()
+        ok = user32.GetUserObjectInformationW(h, 2, buf, ctypes.sizeof(buf), ctypes.byref(need))  # UOI_NAME
+        return bool(ok) and buf.value.lower() != "default"
+    finally:
+        user32.CloseDesktop(h)
+
+
+def keep_awake(on: bool) -> None:
+    """Během práce se počítač neuspí ani nezhasne obrazovku (a tím se nezamkne)."""
+    if WIN:
+        es = 0x80000000 | ((0x00000001 | 0x00000002) if on else 0)   # CONTINUOUS | SYSTEM | DISPLAY
+        ctypes.windll.kernel32.SetThreadExecutionState(es)
+
+
+KEY_ALIASES = {"plus": "add", "minus": "subtract", "-": "subtract", "escape": "esc", "return": "enter",
+               "windows": "win", "super": "win", "cmd": "win", "meta": "win", "control": "ctrl", "del": "delete",
+               "pgdn": "pagedown", "pgup": "pageup", "page_down": "pagedown", "page_up": "pageup",
+               "arrowdown": "down", "arrowup": "up", "arrowleft": "left", "arrowright": "right", "spacebar": "space",
+               "backspace": "backspace", "bksp": "backspace", "ins": "insert", "option": "alt"}
 
 
 def key_parts(key: str) -> list[str]:
@@ -685,15 +702,13 @@ def key_parts(key: str) -> list[str]:
     import pyautogui
 
     raw = key.replace(" ", "").lower()
-    if raw == "+" or raw.endswith("++"):
+    if raw == "+" or raw.endswith("++"):                  # „+“, „ctrl++“
         raw = raw[:-1] + "plus" if raw != "+" else "plus"
     parts = [KEY_ALIASES.get(p, p) for p in raw.split("+") if p]
     bad = [p for p in parts if p not in pyautogui.KEYBOARD_KEYS]
     if not parts or bad:
-        raise ValueError(
-            f"neznámá klávesa {', '.join(bad) or key!r} – použij např. enter, esc, tab, ctrl+l, "
-            "alt+left, f5, ctrl+plus"
-        )
+        raise ValueError(f"neznámá klávesa {', '.join(bad) or key!r} – použij např. enter, esc, tab, ctrl+l, "
+                         "alt+left, f5, ctrl+plus")
     return parts
 
 
@@ -729,23 +744,12 @@ def type_text(text: str) -> None:
     from ctypes import wintypes
 
     class KEYBDINPUT(ctypes.Structure):
-        _fields_ = [
-            ("wVk", wintypes.WORD),
-            ("wScan", wintypes.WORD),
-            ("dwFlags", wintypes.DWORD),
-            ("time", wintypes.DWORD),
-            ("dwExtraInfo", ctypes.c_size_t),
-        ]
+        _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
+                    ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
 
     class MOUSEINPUT(ctypes.Structure):
-        _fields_ = [
-            ("dx", wintypes.LONG),
-            ("dy", wintypes.LONG),
-            ("mouseData", wintypes.DWORD),
-            ("dwFlags", wintypes.DWORD),
-            ("time", wintypes.DWORD),
-            ("dwExtraInfo", ctypes.c_size_t),
-        ]
+        _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD),
+                    ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
 
     class _U(ctypes.Union):
         _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT)]
@@ -757,7 +761,7 @@ def type_text(text: str) -> None:
     send = ctypes.windll.user32.SendInput
     data = text.encode("utf-16-le")
     for i in range(0, len(data), 2):
-        code = int.from_bytes(data[i : i + 2], "little")
+        code = int.from_bytes(data[i:i + 2], "little")
         down = INPUT(1, _U(ki=KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)))
         up = INPUT(1, _U(ki=KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)))
         arr = (INPUT * 2)(down, up)
